@@ -4,6 +4,29 @@ pragma solidity ^0.8.9;
 // Import this file to use console.log
 import "hardhat/console.sol";
 
+contract Digitalcard {
+    struct Uni3_card {
+        uint256 card_id;
+    }
+    
+    // user contacts
+    mapping (address => address[]) public contacts;
+    mapping (address => mapping(address => uint32)) public borrowedFrom;
+
+    event contactAdded(address user, address new_contact);
+    event borrowed(address user, address lender, uint32 amount);
+
+    // this is not preventing duplicate contacts currently
+    function addContact(address _contact) public {
+        contacts[msg.sender].push(_contact);
+    }
+    function getContact() public view returns (address[]) {
+        contacts[msg.sender];
+    }
+
+
+}
+
 contract Lock {
     uint public unlockTime;
     address payable public owner;
