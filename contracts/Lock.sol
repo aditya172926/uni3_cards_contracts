@@ -39,7 +39,7 @@ contract Digitalcard {
         uint256 card_id;
     }
 
-    address public usdCaddress = 0x07865c6E87B9F70255377e024ace6630C1Eaa37F;
+    address public usdCaddress = 0x07865c6E87B9F70255377e024ace6630C1Eaa37F; // for goreli testnet
     
 
     // user contacts
@@ -48,7 +48,8 @@ contract Digitalcard {
     mapping(address => mapping(address => bool)) public borrowedFrom; // lender -> borrower -> loan given (true) or not (false)
 
     event contactAdded(address user, address new_contact);
-    event borrowed(address user, address lender, uint32 amount);
+    event borrowRequested(address indexed lender, address indexed borrwoer, uint32 amount);
+    event borrowed(address indexed lender, address borrower, uint32 amount);
 
     // this is not preventing duplicate contacts currently
     function addContact(address _contact) public {
@@ -59,13 +60,16 @@ contract Digitalcard {
         contacts[msg.sender];
     }
 
+    // ask for borrowing money
     function initiateBorrowRequest(
         address from,
         uint32 _amount
     ) public {
         borrowRequests[msg.sender][from] = _amount;
+        emit borrowRequested(from, msg.sender, _amount);
     }
 
+    // approve borrow request and send tokens
     function sendERC20Tokens(
         address to,
         uint256 _amount
@@ -91,33 +95,8 @@ contract Digitalcard {
     */
 
     // Next comes the repayment functions.
+
+    // function payBack() public {
+
+    // }
 }
-
-// contract Lock {
-//     uint256 public unlockTime;
-//     address payable public owner;
-
-//     event Withdrawal(uint256 amount, uint256 when);
-
-//     constructor(uint256 _unlockTime) payable {
-//         require(
-//             block.timestamp < _unlockTime,
-//             "Unlock time should be in the future"
-//         );
-
-//         unlockTime = _unlockTime;
-//         owner = payable(msg.sender);
-//     }
-
-//     function withdraw() public {
-//         // Uncomment this line to print a log in your terminal
-//         // console.log("Unlock time is %o and block timestamp is %o", unlockTime, block.timestamp);
-
-//         require(block.timestamp >= unlockTime, "You can't withdraw yet");
-//         require(msg.sender == owner, "You aren't the owner");
-
-//         emit Withdrawal(address(this).balance, block.timestamp);
-
-//         owner.transfer(address(this).balance);
-//     }
-// }
