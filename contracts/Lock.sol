@@ -35,61 +35,67 @@ interface IERC20Token {
 }
 
 contract Digitalcard {
-    struct Uni3_card {
-        uint256 card_id;
-    }
+
+    bool[3] repayments = [false, false, false];
 
     address public usdCaddress = 0x07865c6E87B9F70255377e024ace6630C1Eaa37F; // for goreli testnet
+
+    struct borrowRequest {
+        uint16 amount;
+        string token;
+    }
     
+    mapping(address => borrowRequest) borrowerRequests; // borrower -> amount
+    mapping(address => address[]) lendersRequested; // lender -> borrowers array
 
     // user contacts
-    mapping(address => address[]) public contacts;
-    mapping(address => mapping(address => uint32)) public borrowRequests; // borrower -> from -> amount
-    mapping(address => mapping(address => bool)) public borrowedFrom; // lender -> borrower -> loan given (true) or not (false)
 
-    event contactAdded(address user, address new_contact);
-    event borrowRequested(address indexed lender, address indexed borrwoer, uint32 amount);
-    event borrowed(address indexed lender, address borrower, uint32 amount);
-
-    // this is not preventing duplicate contacts currently
-    function addContact(address _contact) public {
-        contacts[msg.sender].push(_contact);
-    }
-
-    function getContact() public view returns (address[] memory) {
-        contacts[msg.sender];
-    }
+    event borrowRequested(address indexed lender, address indexed borrower, uint32 amount);
+    event moneyLent(address indexed lender, address borrower, uint32 amount, string token);
 
     // ask for borrowing money
     function initiateBorrowRequest(
         address from,
-        uint32 _amount
+        uint16 _amount,
+        string memory tokentype
     ) public {
-        borrowRequests[msg.sender][from] = _amount;
+        lendersRequested[from].push(msg.sender);
+
+        borrowerRequests[msg.sender] = borrowRequest(
+            _amount,
+            tokentype
+        );
         emit borrowRequested(from, msg.sender, _amount);
     }
 
+    function getBorrowerRequests(address _borrower) public view returns (uint16, string memory) {
+        return (borrowerRequests[_borrower].amount, borrowerRequests[_borrower].token);
+    }
+
+    function getBorrowers() public view returns (address[] memory) {
+        // a lender can view who has requested for loan
+        return lendersRequested[msg.sender];
+    }
+
     // approve borrow request and send tokens
-    function sendERC20Tokens(
-        address to,
-        uint256 _amount
+    function lendTokens(
+        address _borrower,
+        string memory tokentype
     ) public payable {
-        require(
-            borrowRequests[to][msg.sender] > 0,
-            "The loan wasn't requested"
-        );
-        require(
-            IERC20Token(usdCaddress).transferFrom(msg.sender, to, _amount),
-            "Transaction couldn't be completed"
-        );
-        borrowedFrom[msg.sender][to] = true; // money sent successfully to the borrow request
+            require(
+                IERC20Token(usdCaddress).transferFrom(msg.sender, _borrower, borrowerRequests[_borrower].amount),
+                "Transaction couldn't be completed"
+            );
+            emit moneyLent(msg.sender, _borrower, borrowerRequests[_borrower].amount, "USDc");
+    }
+
+    function sendETHToken(address _borrower) public payable {
+        emit moneyLent(msg.sender, _borrower, borrowerRequests[_borrower].amount, "ETH");
     }
     /*
         If borrowRequest for a user is greater than 0, and borrowedFrom for the same user is true,
         that means the money has been sent and now the borrower must repay the debt.
         So we know a borrower needs to repay if ->
-        borrowRequests[msg.sender][from] > 0 and borrwedFrom[msg.sender][to] == true -> means the loan is requested and given. Now start repayment process
-        borrowRequests[msg.sender][from] > 0 and borrwedFrom[msg.sender][to] == false -> means the loan is requested but is still pending to be given
 
         Without requesting a loan, a person cannot send money to anyone.
     */
