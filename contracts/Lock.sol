@@ -39,6 +39,7 @@ contract Digitalcard {
     bool[3] repayments = [false, false, false];
 
     address public usdCaddress = 0x07865c6E87B9F70255377e024ace6630C1Eaa37F; // for goreli testnet
+    address constant treasury_address = 0xd4C88BDeE3a708d6A13A7aFE3B5f93f1DA5375D8;
 
     struct borrowRequest {
         address lender;
@@ -46,6 +47,7 @@ contract Digitalcard {
         uint8 repayments;
         uint16 amount;
         string token;
+        bool gotLoan;
     }
     
     mapping(address => borrowRequest) borrowerRequests; // borrower -> amount
@@ -55,6 +57,7 @@ contract Digitalcard {
 
     event borrowRequested(address indexed lender, address indexed borrower, uint32 amount);
     event moneyLent(address indexed lender, address borrower, uint32 amount, string token);
+    event tokensRepay(address indexed from, address indexed to, uint32 borrowed_amount, uint32 amount_paid, uint8 installments);
 
     // ask for borrowing money
     function initiateBorrowRequest(
@@ -70,13 +73,19 @@ contract Digitalcard {
             _decimals,
             3,
             _amount,
-            tokentype
+            tokentype,
+            false
         );
         emit borrowRequested(from, msg.sender, _amount);
     }
 
-    function getBorrowerRequests(address _borrower) public view returns (address, uint8, uint16, string memory) {
-        return (borrowerRequests[_borrower].lender, borrowerRequests[_borrower].decimalPlaces, borrowerRequests[_borrower].amount, borrowerRequests[_borrower].token);
+    function getBorrowerRequests(address _borrower) public view returns (address, uint8, uint16, string memory, uint8, bool) {
+        return (borrowerRequests[_borrower].lender, 
+        borrowerRequests[_borrower].decimalPlaces, 
+        borrowerRequests[_borrower].amount, 
+        borrowerRequests[_borrower].token, 
+        borrowerRequests[_borrower].repayments,
+        borrowerRequests[_borrower].gotLoan);
     }
 
     function getBorrowers() public view returns (address[] memory) {
@@ -84,7 +93,6 @@ contract Digitalcard {
         return lendersRequested[msg.sender];
     }
 
-    // burn the request after the loan has been given
     function _burn(uint index) internal {
         require (index < lendersRequested[msg.sender].length, "Index out of range");
         lendersRequested[msg.sender][index] = lendersRequested[msg.sender][lendersRequested[msg.sender].length - 1];
@@ -102,21 +110,27 @@ contract Digitalcard {
                 IERC20Token(usdCaddress).transferFrom(msg.sender, _borrower, amount),
                 "Transaction couldn't be completed"
             );
+        borrowerRequests[_borrower].gotLoan = true;
             emit moneyLent(msg.sender, _borrower, borrowerRequests[_borrower].amount, "USDc");
             _burn(_index);
     }
 
-    function repay(address to, uint16 _amount) public payable {
+    function repay(address to, uint16 _amount, uint16 interest_payment, uint16 treasury_amount) public payable {
         // this is for ERC20 tokens like usdc
         if (borrowerRequests[msg.sender].repayments == 1) {
             require(_amount == borrowerRequests[msg.sender].amount, 
             "This is your final installment for this loan. Please pay the rest of the amount");
         }
         require(
-            IERC20Token(usdCaddress).transferFrom(msg.sender, to, _amount),
+            IERC20Token(usdCaddress).transferFrom(msg.sender, to, (_amount + interest_payment)),
+            "Transfer failed"
+        );
+        require (
+            IERC20Token(usdCaddress).transferFrom(msg.sender, treasury_address, treasury_amount),
             "Transfer failed"
         );
         // partial repayment
+
         if (_amount < borrowerRequests[msg.sender].amount) {
             borrowerRequests[msg.sender].amount -= _amount;
             borrowerRequests[msg.sender].repayments--;
@@ -125,6 +139,7 @@ contract Digitalcard {
         if (_amount == borrowerRequests[msg.sender].amount) {
             borrowerRequests[msg.sender].amount -= _amount;
             borrowerRequests[msg.sender].repayments = 0;
+            borrowerRequests[msg.sender].gotLoan = false;
         }
 
     }
