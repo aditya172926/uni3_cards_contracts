@@ -35,53 +35,48 @@ interface IERC20Token {
 }
 
 contract Digitalcard {
+
     bool[3] repayments = [false, false, false];
 
     address public usdCaddress = 0x07865c6E87B9F70255377e024ace6630C1Eaa37F; // for goreli testnet
 
     struct borrowRequest {
+        address lender;
+        uint8 decimalPlaces;
+        uint8 repayments;
         uint16 amount;
         string token;
     }
-
+    
     mapping(address => borrowRequest) borrowerRequests; // borrower -> amount
     mapping(address => address[]) lendersRequested; // lender -> borrowers array
 
     // user contacts
 
-    event borrowRequested(
-        address indexed lender,
-        address indexed borrower,
-        uint32 amount
-    );
-    event moneyLent(
-        address indexed lender,
-        address borrower,
-        uint32 amount,
-        string token
-    );
+    event borrowRequested(address indexed lender, address indexed borrower, uint32 amount);
+    event moneyLent(address indexed lender, address borrower, uint32 amount, string token);
 
     // ask for borrowing money
     function initiateBorrowRequest(
         address from,
         uint16 _amount,
-        string memory tokentype
+        string memory tokentype,
+        uint8 _decimals
     ) public {
         lendersRequested[from].push(msg.sender);
 
-        borrowerRequests[msg.sender] = borrowRequest(_amount, tokentype);
+        borrowerRequests[msg.sender] = borrowRequest(
+            from,
+            _decimals,
+            3,
+            _amount,
+            tokentype
+        );
         emit borrowRequested(from, msg.sender, _amount);
     }
 
-    function getBorrowerRequests(address _borrower)
-        public
-        view
-        returns (uint16, string memory)
-    {
-        return (
-            borrowerRequests[_borrower].amount,
-            borrowerRequests[_borrower].token
-        );
+    function getBorrowerRequests(address _borrower) public view returns (address, uint8, uint16, string memory) {
+        return (borrowerRequests[_borrower].lender, borrowerRequests[_borrower].decimalPlaces, borrowerRequests[_borrower].amount, borrowerRequests[_borrower].token);
     }
 
     function getBorrowers() public view returns (address[] memory) {
@@ -89,34 +84,53 @@ contract Digitalcard {
         return lendersRequested[msg.sender];
     }
 
+    // burn the request after the loan has been given
+    function _burn(uint index) internal {
+        require (index < lendersRequested[msg.sender].length, "Index out of range");
+        lendersRequested[msg.sender][index] = lendersRequested[msg.sender][lendersRequested[msg.sender].length - 1];
+        lendersRequested[msg.sender].pop();
+    }
+
     // approve borrow request and send tokens
-    function lendTokens(address _borrower, string memory tokentype)
-        public
-        payable
-    {
+    function lendTokens(
+        address _borrower,
+        string memory tokentype,
+        uint16 amount,
+        uint _index
+    ) public payable {
+            require(
+                IERC20Token(usdCaddress).transferFrom(msg.sender, _borrower, amount),
+                "Transaction couldn't be completed"
+            );
+            emit moneyLent(msg.sender, _borrower, borrowerRequests[_borrower].amount, "USDc");
+            _burn(_index);
+    }
+
+    function repay(address to, uint16 _amount) public payable {
+        // this is for ERC20 tokens like usdc
+        if (borrowerRequests[msg.sender].repayments == 1) {
+            require(_amount == borrowerRequests[msg.sender].amount, 
+            "This is your final installment for this loan. Please pay the rest of the amount");
+        }
         require(
-            IERC20Token(usdCaddress).transferFrom(
-                msg.sender,
-                _borrower,
-                borrowerRequests[_borrower].amount
-            ),
-            "Transaction couldn't be completed"
+            IERC20Token(usdCaddress).transferFrom(msg.sender, to, _amount),
+            "Transfer failed"
         );
-        emit moneyLent(
-            msg.sender,
-            _borrower,
-            borrowerRequests[_borrower].amount,
-            "USDc"
-        );
+        // partial repayment
+        if (_amount < borrowerRequests[msg.sender].amount) {
+            borrowerRequests[msg.sender].amount -= _amount;
+            borrowerRequests[msg.sender].repayments--;
+        }
+        // repay the whole
+        if (_amount == borrowerRequests[msg.sender].amount) {
+            borrowerRequests[msg.sender].amount -= _amount;
+            borrowerRequests[msg.sender].repayments = 0;
+        }
+
     }
 
     function sendETHToken(address _borrower) public payable {
-        emit moneyLent(
-            msg.sender,
-            _borrower,
-            borrowerRequests[_borrower].amount,
-            "ETH"
-        );
+        emit moneyLent(msg.sender, _borrower, borrowerRequests[_borrower].amount, "ETH");
     }
     /*
         If borrowRequest for a user is greater than 0, and borrowedFrom for the same user is true,
