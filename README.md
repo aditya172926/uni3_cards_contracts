@@ -1,13 +1,12 @@
-# Sample Hardhat Project
+# <p align="center">Uni3 Smart Contracts</p>
+## <p align="center">Technologies Used</p>
+- Solidity Language
+- Remix
+- Hardhat
+- ERC20 Interface
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+## <p align="center">Specifications</p>
+Deployed Networks
+- Ethereum Goreli - 0xACc7b2B27BF44314248b4d3F8960D93Ce8e137b3
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-GAS_REPORT=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.js
-```
+Website - https://uni3-credit-card.vercel.app/
