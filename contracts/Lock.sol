@@ -45,9 +45,9 @@ contract Digitalcard {
         address lender;
         uint8 decimalPlaces;
         uint8 repayments;
-        uint16 amount;
         string token;
         bool gotLoan;
+        uint256 amount;
     }
     
     mapping(address => borrowRequest) borrowerRequests; // borrower -> amount
@@ -56,8 +56,8 @@ contract Digitalcard {
     // user contacts
 
     event borrowRequested(address indexed lender, address indexed borrower, uint32 amount);
-    event moneyLent(address indexed lender, address borrower, uint32 amount, string token);
-    event tokensRepay(address indexed from, address indexed to, uint32 borrowed_amount, uint32 amount_paid, uint8 installments);
+    event moneyLent(address indexed lender, address borrower, uint256 amount, string token);
+    event tokensRepay(address indexed from, address indexed to, uint256 borrowed_amount, uint256 amount_paid, uint8 installments);
 
     // ask for borrowing money
     function initiateBorrowRequest(
@@ -72,14 +72,14 @@ contract Digitalcard {
             from,
             _decimals,
             3,
-            _amount,
             tokentype,
-            false
+            false,
+            _amount
         );
         emit borrowRequested(from, msg.sender, _amount);
     }
 
-    function getBorrowerRequests(address _borrower) public view returns (address, uint8, uint16, string memory, uint8, bool) {
+    function getBorrowerRequests(address _borrower) public view returns (address, uint8, uint256, string memory, uint8, bool) {
         return (borrowerRequests[_borrower].lender, 
         borrowerRequests[_borrower].decimalPlaces, 
         borrowerRequests[_borrower].amount, 
@@ -103,7 +103,7 @@ contract Digitalcard {
     function lendTokens(
         address _borrower,
         string memory tokentype,
-        uint16 amount,
+        uint256 amount,
         uint _index
     ) public payable {
             require(
@@ -115,7 +115,7 @@ contract Digitalcard {
             _burn(_index);
     }
 
-    function repay(address to, uint16 _amount, uint16 interest_payment, uint16 treasury_amount) public payable {
+    function repay(address to, uint256 _amount, uint256 interest_payment, uint256 treasury_amount) public payable {
         // this is for ERC20 tokens like usdc
         if (borrowerRequests[msg.sender].repayments == 1) {
             require(_amount == borrowerRequests[msg.sender].amount, 
@@ -133,7 +133,7 @@ contract Digitalcard {
 
         if (_amount < borrowerRequests[msg.sender].amount) {
             borrowerRequests[msg.sender].amount -= _amount;
-            borrowerRequests[msg.sender].repayments--;
+            borrowerRequests[msg.sender].repayments -= 1;
         }
         // repay the whole
         if (_amount == borrowerRequests[msg.sender].amount) {
