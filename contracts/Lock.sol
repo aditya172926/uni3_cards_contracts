@@ -36,8 +36,6 @@ interface IERC20Token {
 
 contract Digitalcard {
 
-    bool[3] repayments = [false, false, false];
-
     address public usdCaddress = 0x07865c6E87B9F70255377e024ace6630C1Eaa37F; // for goreli testnet
     address constant treasury_address = 0xd4C88BDeE3a708d6A13A7aFE3B5f93f1DA5375D8;
 
@@ -131,13 +129,13 @@ contract Digitalcard {
         );
         // partial repayment
 
-        if (_amount < borrowerRequests[msg.sender].amount) {
-            borrowerRequests[msg.sender].amount -= _amount;
+        if (_amount < borrowerRequests[msg.sender].amount * (10 ** (6 - borrowerRequests[msg.sender].decimalPlaces))) {
+            borrowerRequests[msg.sender].amount -= (_amount / (10 ** ((6 - borrowerRequests[msg.sender].decimalPlaces))));
             borrowerRequests[msg.sender].repayments -= 1;
         }
         // repay the whole
-        if (_amount == borrowerRequests[msg.sender].amount) {
-            borrowerRequests[msg.sender].amount -= _amount;
+        if (_amount == borrowerRequests[msg.sender].amount * (10 ** (6 - borrowerRequests[msg.sender].decimalPlaces))) {
+            borrowerRequests[msg.sender].amount -= 0 ;
             borrowerRequests[msg.sender].repayments = 0;
             borrowerRequests[msg.sender].gotLoan = false;
         }
@@ -145,19 +143,8 @@ contract Digitalcard {
     }
 
     function sendETHToken(address _borrower) public payable {
+        
         emit moneyLent(msg.sender, _borrower, borrowerRequests[_borrower].amount, "ETH");
     }
-    /*
-        If borrowRequest for a user is greater than 0, and borrowedFrom for the same user is true,
-        that means the money has been sent and now the borrower must repay the debt.
-        So we know a borrower needs to repay if ->
 
-        Without requesting a loan, a person cannot send money to anyone.
-    */
-
-    // Next comes the repayment functions.
-
-    // function payBack() public {
-
-    // }
 }
